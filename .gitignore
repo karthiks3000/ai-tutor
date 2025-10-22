@@ -75,3 +75,8 @@ coverage/
 *.tsbuildinfo
 .cache/
 amplify_outputs.json
+.dockerignore
+.bedrock_agentcore
+.env.development
+cdk/cdk-outputs-dev.json
+agents/tutor_agent/.bedrock_agentcore.yaml

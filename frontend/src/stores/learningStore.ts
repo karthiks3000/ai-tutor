@@ -40,7 +40,7 @@ interface LearningStore {
   
   // Legacy actions
   setLesson: (lesson: LessonContent) => void;
-  setQuiz: (quiz: Quiz) => void;
+  setQuiz: (quiz: Quiz | null) => void;
   setCurrentQuestionIndex: (index: number) => void;
   setFeedback: (feedback: Feedback) => void;
   setLoading: (loading: boolean) => void;

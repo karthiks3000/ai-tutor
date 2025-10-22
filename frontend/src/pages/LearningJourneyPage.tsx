@@ -18,6 +18,7 @@ import OverallSummaryView from '../components/learning/OverallSummaryView';
 import JourneyProgressBar from '../components/learning/JourneyProgressBar';
 import SubjectSelectionView from '../components/learning/SubjectSelectionView';
 import DiagnosticResultsView from '../components/learning/DiagnosticResultsView';
+import DiagnosticLoadingAnimation from '../components/learning/DiagnosticLoadingAnimation';
 import XPCounter from '../components/gamification/XPCounter';
 import AchievementModal from '../components/gamification/AchievementModal';
 import { LessonContent, Achievement, Subject } from '../types';
@@ -81,6 +82,7 @@ export default function LearningJourneyPage() {
 
   const handleSubjectSelect = async (subject: Subject) => {
     setCurrentSubject(subject);
+    setQuiz(null); // Clear any previous quiz to show loading animation
     setJourneyState('diagnostic');
     await loadDiagnosticQuiz(subject);
   };
@@ -384,6 +386,12 @@ export default function LearningJourneyPage() {
         )}
 
         {/* DIAGNOSTIC QUIZ */}
+        {journeyState === 'diagnostic' && !currentQuiz && api.isLoading && (
+          <DiagnosticLoadingAnimation 
+            subjectName={SUBJECT_DISPLAY_INFO[currentSubject as Subject]?.displayName || 'your subject'}
+          />
+        )}
+
         {journeyState === 'diagnostic' && currentQuiz && (
           <div className="card-3d p-8 animate-in slide-in-from-bottom duration-500">
             <h2 className="text-2xl font-bold mb-6">📝 Diagnostic Assessment</h2>
@@ -467,8 +475,8 @@ export default function LearningJourneyPage() {
           />
         )}
 
-        {/* Loading State */}
-        {!currentQuiz && !currentLesson && !showSectionSummary && !showOverallSummary && api.isLoading && (
+        {/* Loading State - Only show for non-diagnostic loading */}
+        {!currentQuiz && !currentLesson && !showSectionSummary && !showOverallSummary && api.isLoading && journeyState !== 'diagnostic' && (
           <div className="card-3d p-12 text-center animate-in fade-in">
             <div className="animate-spin text-5xl mb-4">⏳</div>
             <p className="text-gray-600 text-lg">Loading your personalized content...</p>

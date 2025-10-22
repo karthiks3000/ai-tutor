@@ -51,8 +51,27 @@ export function useAgentApi() {
   // === NEW REFACTORED METHODS (Payload-based) ===
   
   const loadDiagnosticQuiz = useCallback(async (subject: string): Promise<OrchestratorResponse> => {
-    const token = await getAuthToken();
-    return agentClient.requestDiagnostic(subject, token);
+    if (loadingRef.current) {
+      throw new Error('Request already in progress');
+    }
+
+    try {
+      loadingRef.current = true;
+      setIsLoading(true);
+      setError(null);
+
+      const token = await getAuthToken();
+      const response = await agentClient.requestDiagnostic(subject, token);
+      
+      return response;
+    } catch (err: any) {
+      const errorMsg = err.message || 'Failed to load diagnostic quiz';
+      setError(errorMsg);
+      throw err;
+    } finally {
+      setIsLoading(false);
+      loadingRef.current = false;
+    }
   }, [getAuthToken]);
 
   const completeDiagnostic = useCallback(async (
