@@ -4,7 +4,7 @@ Uses Bedrock (Amazon Nova Pro) to create engaging, personalized reading passages
 """
 import uuid
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 from models.constants import DifficultyLevel, StudentInterest, FocusArea, LessonContentType
 from models.lesson_models import LessonContent, VocabularyWord
 from tools.bedrock_client import BedrockClient
@@ -16,7 +16,7 @@ def generate_lesson_content(
     topic: str,
     difficulty_level: DifficultyLevel,
     student_interests: List[StudentInterest],
-    focus_areas: List[FocusArea],
+    focus_areas: Union[List[FocusArea], List[str]],
     grade_level: int = 7,
     word_count: int = 300,
     region: str = "us-east-1"
@@ -42,7 +42,15 @@ def generate_lesson_content(
     
     # Build AI prompt for lesson generation
     interests_str = ', '.join([i.value for i in student_interests[:3]]) if student_interests else 'general learning'
-    focus_str = ', '.join([f.value for f in focus_areas])
+    
+    # Handle both FocusArea enums and string skill areas
+    if focus_areas:
+        if isinstance(focus_areas[0], str):
+            focus_str = ', '.join(focus_areas)  # type: ignore
+        else:
+            focus_str = ', '.join([f.value for f in focus_areas])  # type: ignore
+    else:
+        focus_str = "general"
     
     prompt = f"""You are an expert middle school English teacher creating an engaging lesson.
 
@@ -132,7 +140,7 @@ Respond with ONLY valid JSON, no markdown code blocks, no additional text."""
             key_vocabulary=key_vocabulary,
             learning_objectives=lesson_data.get('learning_objectives', []),
             student_interest_alignment=[i.value for i in student_interests],
-            focus_areas=focus_areas,
+            focus_areas=[],  # Legacy field, not used for subject-agnostic
             content_type=LessonContentType.READING_PASSAGE
         )
         
@@ -151,5 +159,6 @@ Respond with ONLY valid JSON, no markdown code blocks, no additional text."""
         logger.error(f"❌ Lesson generation failed for topic '{topic}': {str(e)}")
         logger.error(f"   Difficulty: {difficulty_level.value}, Grade: {grade_level}")
         logger.error(f"   Student interests: {[i.value for i in student_interests]}")
-        logger.error(f"   Focus areas: {[f.value for f in focus_areas]}")
+        focus_values = focus_areas if (focus_areas and isinstance(focus_areas[0], str)) else [f.value for f in focus_areas] if focus_areas else []  # type: ignore
+        logger.error(f"   Focus areas: {focus_values}")
         raise RuntimeError(f"Lesson generation failed: {str(e)}") from e

@@ -9,6 +9,7 @@ from .constants import (
     StudentInterest,
     FocusArea,
     DifficultyLevel,
+    Subject,
 )
 
 
@@ -37,11 +38,19 @@ class StudentProfile(BaseModel):
     name: str
     email: str
     grade: GradeLevel
+    subject: Subject  # Primary learning subject
     interests: List[StudentInterest] = Field(default_factory=list)
     learning_profile: LearningProfile
     strengths: List[FocusArea] = Field(default_factory=list)
     focus_areas: List[FocusArea] = Field(default_factory=list)
     preferences: StudentPreferences = Field(default_factory=StudentPreferences)
+    
+    # Onboarding tracking
+    survey_completed: bool = False
+    survey_interests: List[StudentInterest] = Field(default_factory=list)
+    survey_grade: GradeLevel = GradeLevel.GRADE_7
+    current_lesson_plan_id: Optional[str] = None
+    current_section_index: int = 0
     
     # Gamification
     total_xp: int = 0

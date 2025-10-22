@@ -1,14 +1,13 @@
 /**
- * QuizResultsReview - Display quiz results and prepare next lesson
+ * QuizResultsReview - Display section quiz results
  * 
- * Shows immediate feedback on quiz performance while background loading
- * the next adaptive lesson based on student's results.
+ * Shows immediate feedback on quiz performance.
+ * Parent component (LearningJourneyPage) handles all API calls.
  */
 
-import { useState, useEffect, useRef } from 'react';
-import { Question, LessonContent } from '../../types/learning';
+import { useEffect } from 'react';
+import { Question } from '../../types/learning';
 import { QuizEvaluation } from '../../utils/quizEvaluator';
-import { useAgentApi } from '../../hooks/useAgentApi';
 import { useProgressStore } from '../../stores/progressStore';
 
 interface QuizResultsReviewProps {
@@ -18,7 +17,9 @@ interface QuizResultsReviewProps {
   questions: Question[];
   studentAnswers: (string | string[])[];
   evaluation: QuizEvaluation;
-  onNextLesson: (lesson: LessonContent, tutorMessage: string) => void;
+  sectionNum: number;
+  isNextReady: boolean;
+  onContinue: () => void;
 }
 
 export function QuizResultsReview({
@@ -28,57 +29,17 @@ export function QuizResultsReview({
   questions,
   studentAnswers,
   evaluation,
-  onNextLesson
+  sectionNum,
+  isNextReady,
+  onContinue
 }: QuizResultsReviewProps) {
-  const api = useAgentApi();
   const { addXP } = useProgressStore();
-  const [nextLesson, setNextLesson] = useState<LessonContent | null>(null);
-  const [tutorMessage, setTutorMessage] = useState<string>('');
-  const [isLoadingNext, setIsLoadingNext] = useState(true);
-  const hasLoadedRef = useRef(false); // Prevent duplicate API calls
 
-  // Award XP immediately when component mounts
+  // Award XP immediately
   useEffect(() => {
     addXP(evaluation.xpEarned);
   }, [evaluation.xpEarned, addXP]);
 
-  // Background API call to get next adaptive lesson (ONCE only)
-  useEffect(() => {
-    if (hasLoadedRef.current) return; // Prevent duplicate calls
-    hasLoadedRef.current = true;
-    
-    const loadNextLesson = async () => {
-      try {
-        setIsLoadingNext(true);
-        
-        // Call backend with quiz results
-        // Backend will analyze performance and generate targeted lesson
-        const response = await api.invoke(
-          `Process quiz results: quiz_id=${quizId}, type=${quizType}, topic=${topic}, ` +
-          `score=${evaluation.scorePercentage.toFixed(1)}%, correct=${evaluation.correctCount}/${evaluation.totalQuestions}. ` +
-          `Student struggled with: ${evaluation.feedback
-            .filter(f => !f.isCorrect)
-            .map(f => questions.find(q => q.question_id === f.questionId)?.topic || 'unknown')
-            .join(', ')}. ` +
-          `Generate next lesson targeting weak areas.`
-        );
-        
-        // Check for lesson content and set state
-        if (response.lesson_content) {
-          setNextLesson(response.lesson_content);
-          setTutorMessage(response.tutor_message || 'Ready for your next lesson!');
-        }
-      } catch (err) {
-        console.error('Failed to load next lesson:', err);
-      } finally {
-        setIsLoadingNext(false);
-      }
-    };
-    
-    loadNextLesson();
-  }, []); // Empty deps - run once only on mount
-
-  // Determine score message and color
   const getScoreMessage = () => {
     const score = evaluation.scorePercentage;
     if (score >= 90) return { text: 'Excellent work!', color: 'text-green-600' };
@@ -95,7 +56,6 @@ export function QuizResultsReview({
       <div className="text-center mb-8">
         <h2 className="text-3xl font-bold mb-4">Quiz Complete! 🎉</h2>
         
-        {/* Score Display */}
         <div className={`text-6xl font-bold ${scoreMessage.color} mb-2`}>
           {Math.round(evaluation.scorePercentage)}%
         </div>
@@ -108,7 +68,6 @@ export function QuizResultsReview({
           {scoreMessage.text}
         </div>
         
-        {/* XP Earned */}
         <div className="mt-6 inline-block bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-6 py-3 rounded-full shadow-lg">
           <span className="text-2xl font-bold">+{evaluation.xpEarned} XP</span> earned!
         </div>
@@ -131,14 +90,12 @@ export function QuizResultsReview({
               } transition-all hover:shadow-md`}
             >
               <div className="flex items-start gap-3">
-                {/* Icon */}
                 <div className="flex-shrink-0">
                   <span className="text-3xl">
                     {fb.isCorrect ? '✅' : '❌'}
                   </span>
                 </div>
                 
-                {/* Question and Answer Details */}
                 <div className="flex-1">
                   <p className="font-semibold text-gray-800 mb-2">
                     Question {idx + 1}: {question.question_text}
@@ -165,7 +122,6 @@ export function QuizResultsReview({
                       </p>
                     )}
                     
-                    {/* Explanation */}
                     <div className="mt-3 p-3 bg-white rounded border border-gray-200">
                       <p className="text-gray-700">
                         <span className="font-medium">💡 Explanation:</span> {fb.explanation}
@@ -179,33 +135,29 @@ export function QuizResultsReview({
         })}
       </div>
 
-      {/* Next Lesson Button */}
+      {/* Continue Button */}
       <div className="text-center">
         <button
-          onClick={() => {
-            if (nextLesson) {
-              onNextLesson(nextLesson, tutorMessage);
-            }
-          }}
-          disabled={isLoadingNext || !nextLesson}
+          onClick={onContinue}
+          disabled={!isNextReady}
           className="gradient-button w-full py-4 text-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all"
         >
-          {isLoadingNext ? (
-            <span className="flex items-center justify-center gap-3">
-              <span className="animate-spin text-2xl">⏳</span>
-              <span>Preparing your personalized lesson...</span>
+          {isNextReady ? (
+            <span className="flex items-center justify-center gap-2">
+              <span>{sectionNum < 3 ? 'Continue to Next Section' : 'View Summary'}</span>
+              <span>→</span>
             </span>
           ) : (
-            <span className="flex items-center justify-center gap-2">
-              <span>Continue to Next Lesson</span>
-              <span>→</span>
+            <span className="flex items-center justify-center gap-3">
+              <span className="animate-spin text-2xl">⏳</span>
+              <span>{sectionNum < 3 ? 'Preparing next section...' : 'Preparing summary...'}</span>
             </span>
           )}
         </button>
         
-        {!isLoadingNext && nextLesson && (
+        {isNextReady && (
           <p className="mt-3 text-sm text-green-600 font-medium animate-pulse">
-            ✨ Your personalized lesson is ready!
+            ✨ Ready to continue!
           </p>
         )}
       </div>

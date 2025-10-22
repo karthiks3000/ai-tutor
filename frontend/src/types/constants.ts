@@ -7,7 +7,6 @@ export enum QuestionType {
   MCSA = "mcsa",
   MCMA = "mcma",
   TRUE_FALSE = "true_false",
-  SHORT_ANSWER = "short_answer",
   FILL_IN_BLANK = "fill_in_blank",
   WORD_MATCH = "word_match"
 }
@@ -125,6 +124,13 @@ export enum BadgeRarity {
   LEGENDARY = "legendary"
 }
 
+export enum Subject {
+  ENGLISH = "english",
+  MATH = "math",
+  SCIENCE = "science",
+  HISTORY = "history"
+}
+
 export enum GradeLevel {
   GRADE_6 = 6,
   GRADE_7 = 7,
@@ -175,6 +181,88 @@ export const RARITY_COLORS: Record<BadgeRarity, string> = {
   [BadgeRarity.RARE]: "#3b82f6",
   [BadgeRarity.EPIC]: "#a855f7",
   [BadgeRarity.LEGENDARY]: "#f59e0b"
+};
+
+// Subject display info
+export interface SubjectDisplayInfo {
+  displayName: string;
+  description: string;
+  icon: string;
+  color: string;
+  diagnosticFocuses: string[];
+}
+
+export const SUBJECT_DISPLAY_INFO: Record<Subject, SubjectDisplayInfo> = {
+  [Subject.ENGLISH]: {
+    displayName: "English Language Arts",
+    description: "Master reading, writing, and language skills",
+    icon: "📚",
+    color: "#3b82f6",
+    diagnosticFocuses: ["vocabulary", "grammar", "reading_comprehension"]
+  },
+  [Subject.MATH]: {
+    displayName: "Mathematics",
+    description: "Develop problem-solving and numerical reasoning",
+    icon: "🔢",
+    color: "#10b981",
+    diagnosticFocuses: ["arithmetic", "algebra", "geometry"]
+  },
+  [Subject.SCIENCE]: {
+    displayName: "Science",
+    description: "Explore scientific concepts and inquiry",
+    icon: "🔬",
+    color: "#8b5cf6",
+    diagnosticFocuses: ["scientific_method", "biology", "chemistry", "physics"]
+  },
+  [Subject.HISTORY]: {
+    displayName: "History & Social Studies",
+    description: "Understand past events and their significance",
+    icon: "📜",
+    color: "#f59e0b",
+    diagnosticFocuses: ["chronological_thinking", "cause_effect", "primary_sources"]
+  }
+};
+
+// Subject skill areas (matches backend SUBJECT_SKILL_AREAS)
+export const SUBJECT_SKILL_AREAS: Record<Subject, string[]> = {
+  [Subject.ENGLISH]: [
+    "vocabulary",
+    "grammar",
+    "reading_comprehension",
+    "writing",
+    "spelling",
+    "punctuation",
+    "literary_analysis"
+  ],
+  [Subject.MATH]: [
+    "arithmetic",
+    "algebra",
+    "geometry",
+    "fractions_decimals",
+    "word_problems",
+    "mental_math",
+    "problem_solving",
+    "measurement"
+  ],
+  [Subject.SCIENCE]: [
+    "scientific_method",
+    "biology",
+    "chemistry",
+    "physics",
+    "earth_science",
+    "observation",
+    "lab_skills",
+    "data_analysis"
+  ],
+  [Subject.HISTORY]: [
+    "chronological_thinking",
+    "cause_effect",
+    "primary_sources",
+    "historical_analysis",
+    "geography",
+    "cultural_understanding",
+    "civics"
+  ]
 };
 
 // Interest display info

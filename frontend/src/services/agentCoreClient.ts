@@ -1,5 +1,6 @@
 /**
  * Agent Core API client for communicating with tutor_agent
+ * Supports both new payload-based and legacy prompt-based interfaces
  */
 import env from '../config/environment';
 import { OrchestratorResponse } from '../types';
@@ -14,7 +15,6 @@ export class AgentCoreClient {
 
   private async getSessionId(): Promise<string> {
     try {
-      // Use Cognito's user sub (unique identifier) as session ID
       const session = await fetchAuthSession();
       const sub = session.identityId || session.userSub;
       
@@ -22,23 +22,31 @@ export class AgentCoreClient {
         return sub;
       }
       
-      // Fallback: generate session ID with at least 33 characters
       const now = new Date();
       const timestamp = now.toISOString().replace(/[-:T.]/g, '').substring(0, 14);
       const uuidSuffix = crypto.randomUUID().substring(0, 8);
       return `tutor-session-${timestamp}-${uuidSuffix}`;
     } catch (error) {
-      // Fallback if no session
       const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').substring(0, 14);
       const uuidSuffix = crypto.randomUUID().substring(0, 8);
       return `tutor-session-${timestamp}-${uuidSuffix}`;
     }
   }
 
-  async invoke(prompt: string, jwtToken: string = ''): Promise<OrchestratorResponse> {
+  private async getStudentId(): Promise<string | null> {
     try {
-      // Get session ID from Cognito
+      const session = await fetchAuthSession();
+      return session.userSub || session.identityId || null;
+    } catch (error) {
+      console.error('Failed to get student ID:', error);
+      return null;
+    }
+  }
+
+  async invoke(payload: any, jwtToken: string = ''): Promise<OrchestratorResponse> {
+    try {
       const sessionId = await this.getSessionId();
+      const studentId = await this.getStudentId();
       
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
@@ -46,20 +54,30 @@ export class AgentCoreClient {
         'X-Amzn-Bedrock-AgentCore-Runtime-Session-Id': sessionId,
       };
       
-      // Always include Authorization header if token provided
       if (jwtToken) {
         headers['Authorization'] = `Bearer ${jwtToken}`;
       }
       
-      console.log('🚀 Calling AgentCore:', this.baseUrl);
-      console.log('🔑 Auth token present:', !!jwtToken);
+      // Support both payload structures and legacy prompts
+      let body: any;
+      if (typeof payload === 'string') {
+        body = { prompt: payload };
+      } else {
+        body = { ...payload };
+      }
+      
+      // Add student_id to all payloads
+      if (studentId) {
+        body.student_id = studentId;
+      }
+      
+      console.log('🚀 AgentCore call:', typeof payload === 'string' ? 'prompt' : 'action');
+      console.log('👤 Student ID:', studentId ? 'included' : 'from JWT only');
       
       const response = await fetch(this.baseUrl, {
         method: 'POST',
         headers,
-        body: JSON.stringify({
-          prompt,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) {
@@ -68,7 +86,6 @@ export class AgentCoreClient {
 
       const data = await response.json();
       
-      // Unwrap if backend returns with OrchestratorResponse wrapper
       if (data.OrchestratorResponse) {
         return data.OrchestratorResponse as OrchestratorResponse;
       }
@@ -80,13 +97,69 @@ export class AgentCoreClient {
     }
   }
 
+  // New payload-based methods
+  async completeDiagnostic(
+    quizId: string,
+    subject: string,
+    questions: any[],
+    evaluation: any,
+    jwtToken: string = ''
+  ): Promise<OrchestratorResponse> {
+    return this.invoke({
+      action: 'diagnostic_complete',
+      data: { quiz_id: quizId, subject, questions, evaluation }
+    }, jwtToken);
+  }
+
+  async requestDiagnostic(subject: string, jwtToken: string = ''): Promise<OrchestratorResponse> {
+    return this.invoke({
+      action: 'request_diagnostic',
+      data: { subject }
+    }, jwtToken);
+  }
+
+  async requestSection(previousPerformance?: any, jwtToken: string = ''): Promise<OrchestratorResponse> {
+    return this.invoke({
+      action: 'request_section',
+      data: { previous_performance: previousPerformance }
+    }, jwtToken);
+  }
+
+  async requestSectionQuiz(jwtToken: string = ''): Promise<OrchestratorResponse> {
+    return this.invoke({
+      action: 'request_section_quiz',
+      data: {}
+    }, jwtToken);
+  }
+
+  async completeSection(
+    sectionNum: number,
+    quizId: string,
+    questions: any[],
+    evaluation: any,
+    jwtToken: string = ''
+  ): Promise<OrchestratorResponse> {
+    return this.invoke({
+      action: 'section_complete',
+      data: { section_number: sectionNum, quiz_id: quizId, questions, evaluation }
+    }, jwtToken);
+  }
+
+  async completeLesson(subject: string, jwtToken: string = ''): Promise<OrchestratorResponse> {
+    return this.invoke({
+      action: 'complete_lesson',
+      data: { subject }
+    }, jwtToken);
+  }
+
+  // Legacy methods (for backwards compatibility)
   async startLearningSession(
     studentName: string,
     grade: number,
     interests: string[],
     isFirstTime: boolean = true
   ): Promise<OrchestratorResponse> {
-    const prompt = `Start learning session for ${studentName}, grade ${grade}, interests: ${interests.join(', ')}, first_time: ${isFirstTime}`;
+    const prompt = `Start learning session for ${studentName}, grade ${grade}, interests: ${interests.join(', ')}`;
     return this.invoke(prompt);
   }
 
@@ -95,14 +168,11 @@ export class AgentCoreClient {
     studentAnswer: string | string[],
     questionData: any
   ): Promise<OrchestratorResponse> {
-    const prompt = `Check answer for question ${questionId}: student answered "${JSON.stringify(studentAnswer)}"`;
+    const prompt = `Check answer for question ${questionId}: ${JSON.stringify(studentAnswer)}`;
     return this.invoke(prompt);
   }
 
-  async getNextLesson(
-    topic?: string,
-    difficulty?: string
-  ): Promise<OrchestratorResponse> {
+  async getNextLesson(topic?: string, difficulty?: string): Promise<OrchestratorResponse> {
     const prompt = topic
       ? `Present lesson on ${topic} at ${difficulty || 'intermediate'} level`
       : 'Present next recommended lesson';

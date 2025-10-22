@@ -7,7 +7,7 @@
 import { useState } from 'react';
 import { Question, Quiz, LessonContent } from '../../types';
 import { QuestionType } from '../../types/constants';
-import { evaluateQuiz, areAllQuestionsAnswered } from '../../utils/quizEvaluator';
+import { evaluateQuiz, areAllQuestionsAnswered, QuizEvaluation } from '../../utils/quizEvaluator';
 import QuizResultsReview from './QuizResultsReview';
 import FillInBlankQuestion from './FillInBlankQuestion';
 import MCQQuestion from './MCQQuestion';
@@ -16,11 +16,13 @@ import WordMatchQuestion from './WordMatchQuestion';
 
 interface QuizEngineProps {
   quiz: Quiz;
-  onComplete: () => void;
-  onNextLesson: (lesson: LessonContent, tutorMessage: string) => void;
+  onComplete: (evaluation: QuizEvaluation) => void;
+  onContinueFromResults?: () => void;
+  sectionNum?: number;
+  isNextReady?: boolean;
 }
 
-export default function QuizEngine({ quiz, onComplete, onNextLesson }: QuizEngineProps) {
+export default function QuizEngine({ quiz, onComplete, onContinueFromResults, sectionNum, isNextReady = true }: QuizEngineProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [studentAnswers, setStudentAnswers] = useState<(string | string[] | null)[]>(
     new Array(quiz.questions.length).fill(null)
@@ -55,34 +57,48 @@ export default function QuizEngine({ quiz, onComplete, onNextLesson }: QuizEngin
 
   // Submit quiz and evaluate
   const handleSubmit = () => {
+    // Filter out null values before evaluation
+    const validAnswers = studentAnswers.filter((a): a is string | string[] => a !== null);
+    
     // Instant client-side evaluation
     const evalResult = evaluateQuiz(
       quiz.questions,
-      studentAnswers as (string | string[])[]
+      validAnswers
     );
     
     setEvaluation(evalResult);
+    
+    // Pass evaluation to parent immediately
+    onComplete(evalResult);
+    
     setQuizSubmitted(true);
   };
 
-  // Handle transition to next lesson - pass through to parent
-  const handleNextLesson = (lesson: LessonContent, tutorMessage: string) => {
-    onNextLesson(lesson, tutorMessage);
-    onComplete();
+  // Handle continue from results
+  const handleContinue = () => {
+    // Just transition to next view without re-triggering completion
+    if (onContinueFromResults) {
+      onContinueFromResults();
+    }
   };
 
   // If quiz submitted, show results review
-  if (quizSubmitted && evaluation) {
+  if (quizSubmitted && evaluation && sectionNum) {
+    // Filter out null values for results display
+    const validAnswers = studentAnswers.filter((a): a is string | string[] => a !== null);
+    
     return (
       <QuizResultsReview
-        quizId={quiz.quiz_id}
-        quizType={quiz.quiz_type}
-        topic={quiz.topic}
-        questions={quiz.questions}
-        studentAnswers={studentAnswers as (string | string[])[]}
-        evaluation={evaluation}
-        onNextLesson={handleNextLesson}
-      />
+          quizId={quiz.quiz_id}
+          quizType={quiz.quiz_type}
+          topic={quiz.topic}
+          questions={quiz.questions}
+          studentAnswers={validAnswers}
+          evaluation={evaluation}
+          sectionNum={sectionNum!}
+          isNextReady={isNextReady}
+          onContinue={handleContinue}
+        />
     );
   }
 

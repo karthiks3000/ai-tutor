@@ -149,6 +149,14 @@ class BadgeRarity(str, Enum):
     LEGENDARY = "legendary"    # Gold, exceptional accomplishment
 
 
+class Subject(str, Enum):
+    """Available learning subjects"""
+    ENGLISH = "english"
+    MATH = "math"
+    SCIENCE = "science"
+    HISTORY = "history"
+
+
 class GradeLevel(int, Enum):
     """Middle school grade levels"""
     GRADE_6 = 6
@@ -256,6 +264,80 @@ DIFFICULTY_VOCABULARY_RANGES = {
     DifficultyLevel.BEGINNER: (400, 700),
     DifficultyLevel.INTERMEDIATE: (650, 850),
     DifficultyLevel.ADVANCED: (800, 1000)
+}
+
+# Subject-specific skill areas (replaces hard-coded FocusArea for multi-subject support)
+SUBJECT_SKILL_AREAS: Dict[Subject, list] = {
+    Subject.ENGLISH: [
+        "vocabulary",
+        "grammar",
+        "reading_comprehension",
+        "writing",
+        "spelling",
+        "punctuation",
+        "literary_analysis"
+    ],
+    Subject.MATH: [
+        "arithmetic",
+        "algebra",
+        "geometry",
+        "fractions_decimals",
+        "word_problems",
+        "mental_math",
+        "problem_solving",
+        "measurement"
+    ],
+    Subject.SCIENCE: [
+        "scientific_method",
+        "biology",
+        "chemistry",
+        "physics",
+        "earth_science",
+        "observation",
+        "lab_skills",
+        "data_analysis"
+    ],
+    Subject.HISTORY: [
+        "chronological_thinking",
+        "cause_effect",
+        "primary_sources",
+        "historical_analysis",
+        "geography",
+        "cultural_understanding",
+        "civics"
+    ]
+}
+
+# Subject metadata for AI context and UI display
+SUBJECT_METADATA: Dict[Subject, Dict[str, Any]] = {
+    Subject.ENGLISH: {
+        "display_name": "English Language Arts",
+        "description": "Master reading, writing, and language skills",
+        "icon": "📚",
+        "color": "#3b82f6",
+        "diagnostic_focuses": ["vocabulary", "grammar", "reading_comprehension"]
+    },
+    Subject.MATH: {
+        "display_name": "Mathematics",
+        "description": "Develop problem-solving and numerical reasoning",
+        "icon": "🔢",
+        "color": "#10b981",
+        "diagnostic_focuses": ["arithmetic", "algebra", "geometry"]
+    },
+    Subject.SCIENCE: {
+        "display_name": "Science",
+        "description": "Explore scientific concepts and inquiry",
+        "icon": "🔬",
+        "color": "#8b5cf6",
+        "diagnostic_focuses": ["scientific_method", "biology", "chemistry", "physics"]
+    },
+    Subject.HISTORY: {
+        "display_name": "History & Social Studies",
+        "description": "Understand past events and their significance",
+        "icon": "📜",
+        "color": "#f59e0b",
+        "diagnostic_focuses": ["chronological_thinking", "cause_effect", "primary_sources"]
+    }
 }
 
 # Interest display information

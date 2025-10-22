@@ -4,8 +4,8 @@ Uses Bedrock (Amazon Nova Pro) to generate varied question types with appropriat
 """
 import uuid
 import logging
-from typing import List, Dict, Any, Optional
-from models.constants import QuestionType, QuizType, DifficultyLevel, FocusArea
+from typing import List, Dict, Any, Optional, Union
+from models.constants import QuestionType, QuizType, DifficultyLevel, FocusArea, Subject, SUBJECT_METADATA, SUBJECT_SKILL_AREAS
 from models.lesson_models import Quiz, Question, WordPair
 from tools.bedrock_client import BedrockClient
 
@@ -17,10 +17,12 @@ def generate_adaptive_quiz(
     quiz_type: QuizType,
     num_questions: int,
     difficulty: DifficultyLevel,
-    focus_areas: List[FocusArea],
+    focus_areas: Union[List[FocusArea], List[str]],
     topic: str,
     question_types: Optional[List[QuestionType]] = None,
     student_performance_history: Optional[Dict[str, Any]] = None,
+    subject: Optional[Subject] = None,
+    skill_areas: Optional[List[str]] = None,
     region: str = "us-east-1"
 ) -> Dict[str, Any]:
     """
@@ -55,12 +57,41 @@ def generate_adaptive_quiz(
     
     # Build AI prompt for quiz generation
     question_types_str = ', '.join([f'"{qt.value}"' for qt in question_types])
-    focus_str = ', '.join([f.value for f in focus_areas])
+    
+    # Get subject context
+    subject_context = ""
+    if subject:
+        subject_meta = SUBJECT_METADATA.get(subject, {})
+        subject_context = f"\nSUBJECT: {subject_meta.get('display_name', subject.value)}"
+        if not skill_areas:
+            skill_areas = SUBJECT_SKILL_AREAS.get(subject, [])
+    
+    # Handle both FocusArea enums and string skill areas
+    focus_str = "general"
+    if focus_areas:
+        if isinstance(focus_areas[0], str):
+            focus_str = ', '.join(focus_areas)  # type: ignore
+        else:
+            # FocusArea enums
+            focus_str = ', '.join([f.value for f in focus_areas])  # type: ignore
+    
+    # Use skill_areas if provided, otherwise extract from focus_areas
+    available_skills: List[str] = []
+    if skill_areas:
+        available_skills = skill_areas
+    elif focus_areas:
+        if isinstance(focus_areas[0], str):
+            available_skills = focus_areas  # type: ignore
+        else:
+            # FocusArea enums - extract values
+            available_skills = [f.value for f in focus_areas]  # type: ignore
+    
+    skills_str = ', '.join(available_skills) if available_skills else focus_str
     
     # Build lesson context
     lesson_context = lesson_content[:1000] if lesson_content else f"General {topic} assessment"
     
-    prompt = f"""You are an expert quiz creator for middle school English students.
+    prompt = f"""You are an expert quiz creator for middle school students.{subject_context}
 
 LESSON CONTENT:
 {lesson_context}
@@ -71,6 +102,7 @@ QUIZ PARAMETERS:
 - Difficulty: {difficulty.value}
 - Number of Questions: {num_questions}
 - Focus Areas: {focus_str}
+- Available Skill Areas: {skills_str}
 
 QUESTION TYPES TO USE (distribute evenly):
 1. "mcsa" - Multiple choice with ONE correct answer
@@ -86,6 +118,7 @@ Create exactly {num_questions} questions that:
 3. Mix different question types from the list above
 4. Include detailed explanations for learning
 5. Are engaging and clear
+6. **CRITICAL: Tag each question with skill_areas** from the available list
 
 OUTPUT FORMAT - Return ONLY valid JSON matching this EXACT structure:
 {{
@@ -98,7 +131,8 @@ OUTPUT FORMAT - Return ONLY valid JSON matching this EXACT structure:
       "difficulty": "{difficulty.value}",
       "topic": "{topic}",
       "points": 10,
-      "explanation": "Detailed explanation of why this is correct and what it teaches."
+      "explanation": "Detailed explanation of why this is correct and what it teaches.",
+      "skill_areas": ["skill1", "skill2"]
     }},
     {{
       "question_type": "mcma",
@@ -156,6 +190,7 @@ CRITICAL REQUIREMENTS:
 - For fill_in_blank: use {{blank}} markers in sentence_template, provide blank_positions array
 - For word_match: correct_answer format is ["word1-0", "word2-1", ...] where number is the index
 - difficulty must be: "beginner", "intermediate", or "advanced"
+- **skill_areas: REQUIRED array with 1-2 skills from available list: [{skills_str}]**
 - All fields are required except hint (optional)
 - Include {num_questions} questions total, mixing the question types
 
@@ -208,7 +243,7 @@ Respond with ONLY valid JSON, no markdown code blocks, no additional text."""
             total_questions=len(questions),
             time_limit_seconds=None if quiz_type == QuizType.DIAGNOSTIC else 300,
             passing_score_percentage=70.0,
-            focus_areas=focus_areas
+            focus_areas=[]  # Not used for subject-agnostic - removed
         )
         
         # Extract tutor_message
@@ -225,6 +260,7 @@ Respond with ONLY valid JSON, no markdown code blocks, no additional text."""
         logger.error(f"❌ Quiz generation failed for topic '{topic}': {str(e)}")
         logger.error(f"   Quiz type: {quiz_type.value}, Difficulty: {difficulty.value}")
         logger.error(f"   Number of questions: {num_questions}")
-        logger.error(f"   Focus areas: {[f.value for f in focus_areas]}")
+        focus_values = focus_areas if (focus_areas and isinstance(focus_areas[0], str)) else [f.value for f in focus_areas] if focus_areas else []  # type: ignore
+        logger.error(f"   Focus areas: {focus_values}")
         logger.error(f"   Lesson context length: {len(lesson_context)} chars")
         raise RuntimeError(f"Quiz generation failed: {str(e)}") from e

@@ -22,7 +22,7 @@ export default function OnboardingPage() {
   const handleSubmit = async () => {
     if (grade && selectedInterests.length > 0) {
       try {
-        // Call backend to start learning session (auth handled by hook)
+        // Save onboarding data (grade + interests only, no subject)
         const response = await api.startLearningSession(
           user?.email || 'Student',
           grade,
@@ -30,12 +30,13 @@ export default function OnboardingPage() {
         );
         
         if (response.success) {
+          // Navigate to learning page where user will select subject
           navigate('/learn');
         } else {
-          alert('Failed to start learning session. Please try again.');
+          alert('Failed to save your profile. Please try again.');
         }
       } catch (error) {
-        console.error('Failed to start session:', error);
+        console.error('Failed to save profile:', error);
         alert('Unable to connect to server. Please check your connection.');
       }
     }
@@ -49,9 +50,14 @@ export default function OnboardingPage() {
         {/* Progress Bar */}
         <div className="mb-8">
           <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-purple-600 to-blue-600 w-1/2 transition-all duration-500" />
+            <div 
+              className="h-full bg-gradient-to-r from-purple-600 to-blue-600 transition-all duration-500"
+              style={{ width: `${grade ? '50%' : '0%'}` }}
+            />
           </div>
-          <p className="text-center text-sm text-gray-600 mt-2">Step 1 of 2</p>
+          <p className="text-center text-sm text-gray-600 mt-2">
+            Step {!grade ? '1' : '2'} of 2
+          </p>
         </div>
 
         <h2 className="text-4xl font-bold text-center mb-12">🎯 Let's Personalize Your Learning</h2>
@@ -76,7 +82,8 @@ export default function OnboardingPage() {
         </div>
 
         {/* Interest Selection */}
-        <div className="mb-12">
+        {grade && (
+          <div className="mb-12 animate-in fade-in slide-in-from-bottom duration-500">
           <h3 className="text-2xl font-semibold text-center mb-4">What are your interests?</h3>
           <p className="text-center text-gray-600 mb-6">(Choose as many as you like!)</p>
           <div className="grid grid-cols-3 md:grid-cols-5 gap-4">
@@ -101,18 +108,21 @@ export default function OnboardingPage() {
               );
             })}
           </div>
-        </div>
+          </div>
+        )}
 
         {/* Submit Button */}
-        <div className="text-center">
-          <button
-            onClick={handleSubmit}
-            disabled={!grade || selectedInterests.length === 0 || api.isLoading}
-            className="gradient-button text-xl px-12 py-4 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {api.isLoading ? 'Starting...' : 'Next Step →'}
-          </button>
-        </div>
+        {grade && selectedInterests.length > 0 && (
+          <div className="text-center animate-in fade-in slide-in-from-bottom duration-500">
+            <button
+              onClick={handleSubmit}
+              disabled={!grade || selectedInterests.length === 0 || api.isLoading}
+              className="gradient-button text-xl px-12 py-4 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {api.isLoading ? 'Saving Your Profile...' : 'Continue to Learning →'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

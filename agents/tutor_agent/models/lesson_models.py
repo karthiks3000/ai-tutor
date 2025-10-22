@@ -10,6 +10,7 @@ from .constants import (
     DifficultyLevel,
     LessonContentType,
     FocusArea,
+    Subject,
 )
 
 
@@ -143,3 +144,28 @@ class Achievement(BaseModel):
     
     # Progress tracking
     progress_towards_next: Optional[Dict[str, Any]] = None
+
+
+class SectionPlan(BaseModel):
+    """Plan for a single section within a learning journey"""
+    section_number: int  # 1, 2, 3, etc.
+    subject: Subject
+    topic: str
+    difficulty: DifficultyLevel
+    learning_objectives: List[str]
+    estimated_time_minutes: int
+    skill_areas: List[str]  # Dynamic, from SUBJECT_SKILL_AREAS
+
+
+class LessonPlan(BaseModel):
+    """Complete multi-section learning plan generated from diagnostic"""
+    plan_id: str  # UUID
+    student_id: str
+    subject: Subject
+    total_sections: int = 3  # POC uses 3 sections
+    sections: List[SectionPlan]
+    diagnostic_quiz_id: str
+    created_at: int = Field(default_factory=lambda: int(datetime.now().timestamp()))
+    updated_at: int = Field(default_factory=lambda: int(datetime.now().timestamp()))
+    status: str = "active"  # active, completed, abandoned
+    current_section: int = 0  # 0-based index

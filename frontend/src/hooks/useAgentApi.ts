@@ -1,6 +1,5 @@
 /**
- * Centralized hook for AgentCore API calls
- * Ensures all calls have proper auth headers and prevents duplicates
+ * Centralized hook for AgentCore API calls - Refactored for payload-based architecture
  */
 import { useState, useCallback, useRef } from 'react';
 import { agentClient } from '../services/agentCoreClient';
@@ -10,9 +9,8 @@ import { OrchestratorResponse } from '../types';
 export function useAgentApi() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const loadingRef = useRef(false); // Prevent duplicate calls
+  const loadingRef = useRef(false);
 
-  // Get JWT token once and reuse
   const getAuthToken = useCallback(async (): Promise<string> => {
     try {
       const token = await cognitoService.getJwtToken();
@@ -26,7 +24,6 @@ export function useAgentApi() {
     }
   }, []);
 
-  // Generic invoke with automatic token injection
   const invoke = useCallback(async (prompt: string): Promise<OrchestratorResponse> => {
     if (loadingRef.current) {
       throw new Error('Request already in progress');
@@ -51,26 +48,69 @@ export function useAgentApi() {
     }
   }, [getAuthToken]);
 
-  // Specific API methods with auth headers automatically included
-  const loadDiagnosticQuiz = useCallback(async (): Promise<OrchestratorResponse> => {
-    return invoke('Start diagnostic quiz for middle school English assessment');
-  }, [invoke]);
+  // === NEW REFACTORED METHODS (Payload-based) ===
+  
+  const loadDiagnosticQuiz = useCallback(async (subject: string): Promise<OrchestratorResponse> => {
+    const token = await getAuthToken();
+    return agentClient.requestDiagnostic(subject, token);
+  }, [getAuthToken]);
 
+  const completeDiagnostic = useCallback(async (
+    quizId: string,
+    subject: string,
+    questions: any[],
+    evaluation: any
+  ): Promise<OrchestratorResponse> => {
+    const token = await getAuthToken();
+    return agentClient.completeDiagnostic(quizId, subject, questions, evaluation, token);
+  }, [getAuthToken]);
+
+  const loadNextSection = useCallback(async (): Promise<OrchestratorResponse> => {
+    const token = await getAuthToken();
+    // Backend queries DynamoDB for previous section performance automatically
+    return agentClient.requestSection(undefined, token);
+  }, [getAuthToken]);
+
+  const loadSectionQuiz = useCallback(async (): Promise<OrchestratorResponse> => {
+    const token = await getAuthToken();
+    return agentClient.requestSectionQuiz(token);
+  }, [getAuthToken]);
+
+  const completeSection = useCallback(async (
+    sectionNum: number,
+    quizId: string,
+    questions: any[],
+    evaluation: any
+  ): Promise<OrchestratorResponse> => {
+    const token = await getAuthToken();
+    return agentClient.completeSection(sectionNum, quizId, questions, evaluation, token);
+  }, [getAuthToken]);
+
+  const completeLesson = useCallback(async (subject: string): Promise<OrchestratorResponse> => {
+    const token = await getAuthToken();
+    return agentClient.completeLesson(subject, token);
+  }, [getAuthToken]);
+
+  // === REFACTORED METHODS ===
+  
   const startLearningSession = useCallback(async (
     studentName: string,
     grade: number,
     interests: string[]
   ): Promise<OrchestratorResponse> => {
-    const prompt = `Start learning session for ${studentName}, grade ${grade}, interests: ${interests.join(', ')}, first_time: true`;
-    return invoke(prompt);
-  }, [invoke]);
+    const token = await getAuthToken();
+    return agentClient.invoke({
+      action: 'save_onboarding',
+      data: { grade, interests }
+    }, token);
+  }, [getAuthToken]);
 
   const submitAnswer = useCallback(async (
     questionId: string,
     answer: string | string[],
     questionData: any
   ): Promise<OrchestratorResponse> => {
-    const prompt = `Check answer for question ${questionId}: student answered "${JSON.stringify(answer)}"`;
+    const prompt = `Check answer for question ${questionId}: "${JSON.stringify(answer)}"`;
     return invoke(prompt);
   }, [invoke]);
 
@@ -102,13 +142,21 @@ export function useAgentApi() {
     isLoading,
     error,
     
-    // Methods - all automatically include auth headers
-    invoke,
+    // Refactored payload-based methods
     loadDiagnosticQuiz,
+    completeDiagnostic,
+    loadNextSection,
+    loadSectionQuiz,
+    completeSection,
+    completeLesson,
+    
+    // Legacy prompt-based methods
+    invoke,
     startLearningSession,
     submitAnswer,
     loadLesson,
     loadQuiz,
+    
     clearError,
   };
 }
