@@ -1,0 +1,8 @@
+bedrock-agentcore
+strands-agents
+boto3
+requests
+pydantic
+
+# Utilities
+python-dateutil>=2.8.2
